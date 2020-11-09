@@ -32,7 +32,8 @@ print(tabulate( [ [ re.sub("([A-Z])"," \g<0>", key.lower().capitalize()), stats[
 
 calls = [ client.dict_get(queue + f'/liveCalls/{id}') for id in client.list_get(queue + '/liveCalls') ]
 print(tabulate([ [ call['id'], call['callerIdNumber'].strip(), call['state'], call['agent'], call['begin'], call['answered'] ] for call in calls ],
-               headers=['Id", CallerID', 'State', 'Agent', 'Begin', 'Answered']))
+               headers=['Id', 'CallerID', 'State', 'Agent', 'Begin', 'Answered']))
 
 
 print(datetime.fromtimestamp(client.get('/auth/time')).astimezone().isoformat())
+

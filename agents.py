@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 from datetime import datetime
-import pytz
 import re
-from tabulate import tabulate
+import subprocess
+from email.message import EmailMessage
 
+import pytz
+from tabulate import tabulate
 import ovh
 
 FILE = 'users.txt'
@@ -24,17 +26,17 @@ SERVICE_NAME = '0033478284789'
 SERVICE = f'/telephony/{BILLING_ACCOUNT}/easyHunting/{SERVICE_NAME}'
 AGENT = SERVICE + '/hunting/agent/'
 
-class SortedClient(ovh.Client):
-    def dict_get(self, *args, **kwargs):
-        return dict(sorted(self.get(*args, **kwargs).items()))
-    def list_get(self, *args, **kwargs):
-        return sorted(self.get(*args, **kwargs))
+output = []
+_print = print
+def print(message):
+    _print(message)
+    output.append(message)
 
-client = SortedClient(config_file='./ovh.conf')
+client = ovh.Client(config_file='./ovh.conf')
 
-agents = [ client.get(AGENT + str(agent)) for agent in client.list_get(AGENT) ]
+agents = [ client.get(AGENT + str(agent)) for agent in sorted(client.get(AGENT)) ]
 
-keys = agents[0].keys()
+keys = sorted(agents[0].keys())
 print(tabulate([[ agent[key] for key in keys ] for agent in agents ],
                headers=[re.sub("([A-Z])"," \g<0>", key).capitalize() for key in keys ]))
 
@@ -46,12 +48,26 @@ def set_agent(number):
         elif agent['status'] != 'loggedOut':
             print('Disabling ' + agent['number'])
             client.put(AGENT + str(agent['agentId']), status='loggedOut')
-    if not agent_id:
-        print(f'Agent for number {number} not found')
-        exit(-1)
+    if agent_id:
+        print('Enabling ' + number)
+        client.put(AGENT + str(agent_id), status='available')
+    else:
+        # seems that creating it, and then enabling it, doesn't work (shows as enabled but doesn't get calls)
+        # TODO: test this more.
+        print(f'Agent for number {number} not found, creating and enabling it...')
+        # {"number":"0033602317680","description":null,"status":"available","timeout":10,"wrapUpTime":0,"simultaneousLines":1}
 
-    print('Enabling ' + number)
-    client.put(AGENT + str(agent_id), status='available')
+        result = client.post(AGENT,
+                             description=None, # TODO: add her name
+                             number=number,
+                             simultaneousLines=1,
+                             status='available',
+                             timeout=10,
+                             wrapUpTime=0
+        )
+        agent_id = result['agentId']
+        print(f'created as {agent_id} and enabled')
+
 
 
 def find_current_agent():
@@ -79,3 +95,15 @@ def find_current_agent():
 
 agent = find_current_agent()
 set_agent(agent)
+
+def notify(message):
+    msg = EmailMessage()
+    msg.set_content(message)
+    msg['From'] = "faria@john-adams.dreamhost.com"
+    msg['To'] = "ovh-notification@farialima.net"
+    msg['Subject'] = "Output put of OVH setting task"
+    
+    subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
+
+
+notify("\n".join(output))

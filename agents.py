@@ -75,7 +75,7 @@ def set_agent(name, number):
                              wrapUpTime=0
         )
         agent_id = result['agentId']
-        client.post(AGENT + f'{agent_id}/queue',
+        client.post(AGENT + f'{agent_id}/queue?queueId={queueId}',
                     position=0,
                     queueId=queueId)
         print(f'created as {agent_id} and enabled')

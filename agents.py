@@ -100,7 +100,7 @@ def find_current_agent():
             if line.startswith(day_and_hour):
                 break
         else:
-            raise(f'no line found for {day_and_hour} in {FILE}')
+            raise Exception(f'no line found for {day_and_hour} in {FILE}')
     print(f'Current info to set is: {line}')
     return line[len(day_and_hour)+1:-len(line.split()[-1])-1].replace(':', " ").replace("   ", " ").replace("  ", " ").strip(), line.split()[-1]
     

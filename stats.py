@@ -17,7 +17,7 @@ AGENT = SERVICE + '/hunting/agent/'
 
 _queue = client.get(QUEUE)
 if len(_queue) != 1:
-    print("error " + repr(_queue))
+    print("error, not one queue: " + repr(_queue))
     exit(1)
 
 queueId = _queue[0]

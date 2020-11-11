@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+#
+# To run as a cron job, with a command like this (if running in PST timezone...):
+# 0 4,7 * * * export PYTHONIOENCODING=utf8 && cd /this/directory && . /this/virtualenv/bin/activate && ./agents.py
+#
+#
 from datetime import datetime
 import re
 import subprocess
@@ -90,7 +95,7 @@ def find_current_agent():
         raise Exception(f'Should not run with local time: {now.hour}')
 
     day_and_hour = day + ' ' + hour
-    with open(FILE) as userfile:
+    with open(FILE, encoding="utf-8") as userfile:
         for line in userfile:
             if line.startswith(day_and_hour):
                 break

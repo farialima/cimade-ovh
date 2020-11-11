@@ -1,7 +1,10 @@
+# File must be utf-8 and contain entries for all days to support,
+# at the beginnng of the line
+# Currently, the times (2PM and 4PM) are hardcoded iin the code
 Lundi 2PM: Nom Du Bénévole 0033612345678
 Lundi 4PM: Nom Bénévole 0033411111111
 Mardi 2PM: Nom Bénévole 2 00336222222222
-# une ligne peut être commentée
+# Lines can be commented
 #Mardi 4PM: Nom Bénévole 3 : 0033433333333
 Mardi 4PM: Nom Bénévole 5: 0033655555555
 Mercredi 2PM: Nom Bénévole 6 0033666666666

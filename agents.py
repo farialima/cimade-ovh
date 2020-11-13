@@ -20,9 +20,9 @@ DAYS_OF_WEEK = [
     'Mardi',
     'Mercredi',
     'Jeudi',
-    'Vendredi'
+    'Vendredi',
     'Samedi',
-    'Dimanche'
+    'Dimanche',
     ]
 
 client = ovh.Client(config_file='./ovh.conf')

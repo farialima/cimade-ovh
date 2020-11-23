@@ -88,9 +88,9 @@ def find_current_agent():
     tz = pytz.timezone('Europe/Paris')
     now = datetime.now(tz)
     if now.hour in [15, 16]:
-        hour = '4PM'
+        hour = '16h'
     elif now.hour in [12, 13, 14]:
-        hour = '2PM'
+        hour = '14h'
     else:
         raise Exception(f'Should not run with local time: {now.hour}')
 

@@ -2,9 +2,17 @@
 
 from datetime import datetime
 import re
-from tabulate import tabulate
 
+import pytz
+from tabulate import tabulate
 import ovh
+
+output = []
+_print = print
+def print(message):
+    _print(message)
+    output.append(message)
+
 
 client = ovh.Client(config_file='./ovh.conf')
 
@@ -31,3 +39,11 @@ print(tabulate([ [ call['id'], call['callerIdNumber'].strip(), call['state'], ca
                headers=['Id', 'CallerID', 'State', 'Agent', 'Begin', 'Answered']))
 
 
+def save_log(message):
+    tz = pytz.timezone('Europe/Paris')
+    now = datetime.now(tz)
+    filename = now.strftime("%Y-%m-%d.txt")
+    with open(filename, "a") as file:
+        file.write(message)
+        
+save_log("\n".join(output) + "\n")

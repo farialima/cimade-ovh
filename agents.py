@@ -102,11 +102,8 @@ def find_current_agent():
         else:
             raise Exception(f'no line found for {day_and_hour} in {FILE}')
     print(f'Current info to set is: {line}')
-    return line[len(day_and_hour)+1:-len(line.split()[-1])-1].replace(':', " ").replace("   ", " ").replace("  ", " ").strip(), line.split()[-1]
-    
-
-name, agent = find_current_agent()
-set_agent(name, agent)
+    return _get_name_and_number(line)
+   
 
 def notify(message):
     msg = EmailMessage()
@@ -118,4 +115,56 @@ def notify(message):
     subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
 
 
+
+def set_setting(**setting):
+    ''' Set a setting for all agents. 
+
+Valid settings are (from https://api.ovh.com/console/#/telephony/%7BbillingAccount%7D/easyHunting/%7BserviceName%7D/hunting/agent/%7BagentId%7D#PUT):
+
+breakStatus       long
+description       string
+number            phoneNumber (not a good idea, though, to have the same number for all agents !!)
+simultaneousLines long
+status            telephony.OvhPabxHuntingAgentStatusEnum
+timeout           long
+wrapUpTime        long
+ '''
+
+    for agent in agents:
+        print('Setting ' + str(setting) + ' for ' + agent['number'])
+        client.put(AGENT + str(agent['agentId']), **setting)
+
+def _get_name_and_number(line):
+    # ugly but working :)
+    line = line.replace('\n', '')
+    day_and_hour = " ".join(line.split()[0:2])
+    number = line.split()[-1]
+    return line[len(day_and_hour)+1:-len(number)-1].replace(':', " ").replace("   ", " ").replace("  ", " ").strip(), number
+
+def set_names():
+    with open(FILE, encoding="utf-8") as userfile:
+        for line in userfile:
+            try:
+                name, number = _get_name_and_number(line)
+            except IndexError:
+                print("Skipped line: " + repr(line))
+                continue
+            for agent in agents:
+                if agent['number'] == number:
+                    print('Setting name "' + name + '" for ' + number)
+                    client.put(AGENT + str(agent['agentId']), description=name)
+                    break
+            else:
+                print("agent not found for number: " + number)
+            
+    
+#set_setting(wrapUpTime=10)
+#set_names()
+
+name, agent = find_current_agent()
+set_agent(name, agent)
+
+
 notify("\n".join(output))
+
+

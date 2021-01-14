@@ -97,7 +97,7 @@ def find_current_agent():
     day_and_hour = day + ' ' + hour
     with open(FILE, encoding="utf-8") as userfile:
         for line in userfile:
-            if line.startswith(day_and_hour):
+            if line.lower().startswith(day_and_hour.lower()):
                 break
         else:
             raise Exception(f'no line found for {day_and_hour} in {FILE}')

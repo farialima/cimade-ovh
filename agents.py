@@ -49,9 +49,10 @@ def print(message):
 
 agents = [ client.get(AGENT + str(agent)) for agent in sorted(client.get(AGENT)) ]
 
-keys = sorted(agents[0].keys())
-print(tabulate([[ agent[key] for key in keys ] for agent in agents ],
-               headers=[re.sub("([A-Z])"," \g<0>", key).capitalize() for key in keys ]))
+def _print_agents():
+    keys = sorted(agents[0].keys())
+    print(tabulate([[ agent[key] for key in keys ] for agent in agents ],
+                   headers=[re.sub("([A-Z])"," \g<0>", key).capitalize() for key in keys ]))
 
 def set_agent(name, number):
     agent_id = None
@@ -80,19 +81,20 @@ def set_agent(name, number):
                     queueId=queueId)
         print(f'created as {agent_id} and enabled')
 
-
-
+def _current_hour():
+    tz = pytz.timezone('Europe/Paris')
+    now = datetime.now(tz)
+    if now.minute < 5:
+        return now.hour
+    if now.minute > 40:
+        return now.hour + 1
+  
+    raise Exception(f'Should not run with local time: {now.hour}:{now.minute}')
+    
 def find_current_agent():
     day = DAYS_OF_WEEK[datetime.today().weekday()]
 
-    tz = pytz.timezone('Europe/Paris')
-    now = datetime.now(tz)
-    if now.hour in [15, 16]:
-        hour = '16h'
-    elif now.hour in [12, 13, 14]:
-        hour = '14h'
-    else:
-        raise Exception(f'Should not run with local time: {now.hour}')
+    hour = str(_current_hour()) + 'h'
 
     day_and_hour = day + ' ' + hour
     with open(FILE, encoding="utf-8") as userfile:

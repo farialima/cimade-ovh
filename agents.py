@@ -86,7 +86,7 @@ def _current_hour():
     now = datetime.now(tz)
     if now.minute < 5:
         return now.hour
-    if now.minute > 40:
+    if now.minute > 5:
         return now.hour + 1
   
     raise Exception(f'Should not run with local time: {now.hour}:{now.minute}')

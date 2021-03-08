@@ -7,6 +7,7 @@ exec(open(this_file).read(), dict(__file__=this_file))
 import os
 import sys
 from urllib.parse import parse_qs
+import html
 import re
 from datetime import datetime
 from email.message import EmailMessage
@@ -58,9 +59,9 @@ except:
 def format_tel(tel):
     number = tel.replace(' ', '').replace('-', '')
     if len(number) != 10:
-        raise Exception("Le numero de telephone doit avoir 10 chiffres")
+        raise Exception("Le numero de telephone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
     if not isascii(number) or not number.isnumeric():
-        raise Exception("Le numero de telephone doit n'avoir que des chiffres")        
+        raise Exception("Le numero de telephone doit n'avoir que des chiffres : " + repr(tel)) 
     if not number.startswith("0"):
         raise Exception("Le numero de telephone doit commencer par un zero")
     
@@ -154,7 +155,7 @@ def do_page():
         multiform = parse_qs(query_string)
         try:
             if 'tel' in multiform:
-                tel = multiform['tel'][0]
+                tel = html.unescape(multiform['tel'][0]) # unescape needed because when copy/pasting on Safari, getting chars like "&#8236;" !!
                 number = format_tel(tel)
                 set_agent(number)
                 start_perm()
@@ -225,7 +226,7 @@ do_page()
 def delete_conditions():
     conditions = client.get(CONDITIONS)
     for conditionId in conditions:
-        condition_details = client.get(CONDITIONS + f'/{conditionId}')
+        condition_details = client.delete(CONDITIONS + f'/{conditionId}')
         print(condition_details)
         
 #delete_conditions()

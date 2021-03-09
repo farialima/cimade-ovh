@@ -55,6 +55,17 @@ except:
         except UnicodeEncodeError:
             return False
         return True
+
+def french_datetime():
+    import locale
+    current_locale = locale.getlocale()[0]
+    try:
+        locale.setlocale(locale.LC_TIME, "fr_FR")
+        tz = pytz.timezone('Europe/Paris')
+        now = datetime.now(tz)
+        return now.strftime("%A %d %b %Y à %H:%M:%S")
+    finally:
+        locale.setlocale(locale.LC_TIME, current_locale)
     
 def format_tel(tel):
     number = tel.replace(' ', '').replace('-', '')
@@ -144,9 +155,11 @@ def do_page():
         print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
 
     tel = ''
-    print_html('''<html>
+    now = french_datetime()
+    print_html(f'''<html>
 <body>
 <h1>Permanences T&eacute;l&eacute;phoniques Cimade Lyon</h1>
+<p><i>Page générée le {now}</i></p>
 <p><button onClick="window.location.reload();">Actualiser cette page</button></p>
 ''')
 

@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 import html
 import re
 from datetime import datetime
+import subprocess
 from email.message import EmailMessage
 from html import escape
 
@@ -56,6 +57,15 @@ except:
             return False
         return True
 
+def notify(message):
+    msg = EmailMessage()
+    msg.set_content(message)
+    msg['From'] = "faria@john-adams.dreamhost.com"
+    msg['To'] = "ovh-notification@farialima.net"
+    msg['Subject'] = "Permtel notification"
+    
+    subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
+
 def french_datetime():
     import locale
     current_locale = locale.getlocale()[0]
@@ -69,12 +79,12 @@ def french_datetime():
     
 def format_tel(tel):
     number = tel.replace(' ', '').replace('-', '')
-    if len(number) != 10:
-        raise Exception("Le numero de telephone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
     if not isascii(number) or not number.isnumeric():
-        raise Exception("Le numero de telephone doit n'avoir que des chiffres : " + repr(tel)) 
+        raise Exception("Le numero de téléphone doit n'avoir que des chiffres : " + repr(tel)) 
+    if len(number) != 10:
+        raise Exception("Le numero de téléphone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
     if not number.startswith("0"):
-        raise Exception("Le numero de telephone doit commencer par un zero")
+        raise Exception("Le numero de téléphone doit commencer par un zero")
     
     return "0033" + number[1:]
 
@@ -112,13 +122,13 @@ def set_agent(number):
         if agent['number'] == number:
             agent_id = agent['agentId']
         elif agent['status'] != 'loggedOut':
-            print('Disabling ' + agent['number'])
+            #print('Disabling ' + agent['number'])
             client.put(AGENT + str(agent['agentId']), status='loggedOut')
     if agent_id:
-        print('Enabling ' + number)
+        #print('Enabling ' + number)
         client.put(AGENT + str(agent_id), status='available')
     else:
-        print(f'Agent for number {number} not found, creating and enabling it...')
+        #print(f'Agent for number {number} not found, creating and enabling it...')
         result = client.post(AGENT,
                              description='(no known name)',
                              number=number,
@@ -131,7 +141,7 @@ def set_agent(number):
         client.post(AGENT + f'{agent_id}/queue?queueId={queueId}',
                     position=0,
                     queueId=queueId)
-        print(f'created as {agent_id} and enabled')
+        #print(f'created as {agent_id} and enabled')
 
         
 def stop_perm():
@@ -142,7 +152,7 @@ def stop_perm():
         # {'timeFrom': '19:00:00', 'policy': 'available', 'timeTo': '23:59:59', 'weekDay': 'sunday', 'conditionId': 2692226}
         conditionId = condition['conditionId']
 
-        print(f'Deleting: {conditionId}')
+        #print(f'Deleting: {conditionId}')
         client.delete(CONDITIONS + f'/{conditionId}')
     except ovh.exceptions.BadParametersError as e:
         print(e)
@@ -159,8 +169,7 @@ def do_page():
     print_html(f'''<html>
 <body>
 <h1>Permanences T&eacute;l&eacute;phoniques Cimade Lyon</h1>
-<p><i>Page générée le {now}</i></p>
-<p><button onClick="window.location.reload();">Actualiser cette page</button></p>
+<p><i>Page actualisée le {now}. <a href="/index.py">Actualiser cette page</a></i></p>
 ''')
 
     if ('REQUEST_METHOD' in os.environ and os.environ['REQUEST_METHOD'] == 'POST'):
@@ -173,12 +182,19 @@ def do_page():
                 set_agent(number)
                 start_perm()
                 print_html(f'<p style="color: blue">Permanence commencée sur le numéro {tel}</p>')
+                notify(f'Permanence commencée sur le numéro {tel}')
             else:
                 stop_perm()
                 print_html(f'<p style="color: blue">Permanence terminée</p>')
+                notify('Permanence terminée')
+           
         except Exception as e:
-            print_html(f'<p style="color: red">Erreur: {e}</p>')
-            print_html('Si probleme, Contactez François au 06 99 12 47 55')
+            print_html(f'''<p style="color: red">Erreur: {e}</p>
+<p>Si probl&egrave;me, contactez François au 06 99 12 47 55</p>
+<p><i><a href="/index.py">Actualiser cette page</a></i></p>
+</body>
+</html>''')
+            notify(f'error when setting permanence: {e}')
             raise
 
     print('''<h2>&Eacute;tat actuel</h2>''')
@@ -217,21 +233,28 @@ def do_page():
             print_html("du " + _french_call(call['callerIdNumber']) + _time(call['begin']))
     else:
         print("Pas d'appels")
-    
-    print_html(f'''<h2>D&eacute;marrer la permanence ou changer de numero </h2>
 
+    if condition:
+        print_html('<h2>Changer de num&eacute;ro</h2>')
+    else:
+        print_html('<h2>D&eacute;marrer la permanence</h2>')
+        
+    print_html(f'''
 <form action="index.py" method="POST"> 
-
 Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input name="tel" value="{tel}"/><br/>
 <input type="submit" value="R&eacute;pondre sur ce num&eacute;ro"/>
-
-<h2>Terminer la permanence</h2>
-Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
-<br/>
-Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.
 </form>
 ''')
-    print_html('''</body>
+    if condition:
+        print_html(f'''
+<h2>Terminer la permanence</h2>
+<form action="index.py" method="POST"> 
+Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
+<p style="color:red">Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.</p>
+</form>
+''')
+    print_html('''
+</body>
 </html>
 ''')
 

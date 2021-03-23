@@ -59,7 +59,7 @@ except:
 
 def notify(message):
     msg = EmailMessage()
-    msg.set_content(message)
+    msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
     msg['From'] = "faria@john-adams.dreamhost.com"
     msg['To'] = "ovh-notification@farialima.net"
     msg['Subject'] = "Permtel notification"
@@ -80,11 +80,11 @@ def french_datetime():
 def format_tel(tel):
     number = tel.replace(' ', '').replace('-', '')
     if not isascii(number) or not number.isnumeric():
-        raise Exception("Le numero de téléphone doit n'avoir que des chiffres : " + repr(tel)) 
+        raise Exception("Le numéro de téléphone doit n'avoir que des chiffres : " + repr(tel)) 
     if len(number) != 10:
-        raise Exception("Le numero de téléphone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
+        raise Exception("Le numéro de téléphone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
     if not number.startswith("0"):
-        raise Exception("Le numero de téléphone doit commencer par un zero")
+        raise Exception("Le numéro de téléphone doit commencer par un zero")
     
     return "0033" + number[1:]
 
@@ -207,7 +207,7 @@ def do_page():
         print_html(" répondue par&nbsp;: ")
         agent = get_active_agent()
         if not agent:
-            print_html("(pas de numero de réponse))")
+            print_html("(pas de num&eacute;ro de réponse))")
         else:
             print_html(_french_call(agent['number']))
     print_html("<br/><br/>")

@@ -1,0 +1,6 @@
+DirectoryIndex index.py
+
+RewriteEngine on
+RewriteCond %{REQUEST_URI} !=/index.py
+RewriteCond %{REQUEST_URI} !=/
+RewriteRule (.*) https://permtel.farialima.net/ [R=301,L]

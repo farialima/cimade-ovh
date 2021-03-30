@@ -38,7 +38,7 @@ class Redirect:
     
     def set_agent(self, number):
         client.put(self.sip,
-                       forwardUnconditional=true,
+                       forwardUnconditional=True,
                        forwardUnconditionalNumber=number)
     def start_perm(self):
         # nothing to do -- all in set_agent
@@ -246,27 +246,29 @@ def do_page():
     if ('REQUEST_METHOD' in os.environ and os.environ['REQUEST_METHOD'] == 'POST'):
         query_string = sys.stdin.read()
         multiform = parse_qs(query_string)
+        # or:
+        #import cgi
+        #form = cgi.FieldStorage()
         try:
-            if 'tel' in multiform:
-                tel = html.unescape(multiform['tel'][0]) # unescape needed because when copy/pasting on Safari, getting chars like "&#8236;" !!
+            if 'finish' in multiform:
+                line.stop_perm()
+                print_html(f'<p style="color: blue">Permanence terminée</p>')
+                notify('Permanence terminée')
+            else:
+                 # unescape needed because when copy/pasting on Safari, getting chars like "&#8236;" !!
+                tel = html.unescape(multiform['tel'][0]) if 'tel' in multiform else ''
                 number = format_tel(tel)
                 line.set_agent(number)
                 line.start_perm()
                 print_html(f'<p style="color: blue">Permanence commencée sur le numéro {tel}</p>')
                 notify(f'Permanence commencée sur le numéro {tel}')
-            else:
-                line.stop_perm()
-                print_html(f'<p style="color: blue">Permanence terminée</p>')
-                notify('Permanence terminée')
            
         except Exception as e:
             print_html(f'''<p style="color: red">Erreur: {e}</p>
 <p>Si probl&egrave;me, contactez François au 06 99 12 47 55</p>
 <p><i><a href="./">Actualiser cette page</a></i></p>
-</body>
-</html>''')
+''')
             notify(f'error when setting permanence: {e}')
-            raise
 
     print('''<h2>&Eacute;tat actuel</h2>''')
     
@@ -321,6 +323,7 @@ Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input 
         print_html(f'''
 <h2>Terminer la permanence</h2>
 <form action="." method="POST"> 
+<input type="hidden" name="finish" value="yes"/>
 Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
 ''')
         if answered_calls != None:

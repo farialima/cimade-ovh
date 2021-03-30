@@ -58,7 +58,7 @@ class Redirect:
     def delete_all_agents(self):
         # there's only one agent...
         client.put(self.sip,
-                       forwardUnconditional=false)
+                       forwardUnconditional=False)
         
 class Queue:
     def __init__(self, billing_account, service_name):
@@ -218,11 +218,11 @@ def do_page():
         subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
         
     try:
-        if os.environ['REQUEST_URI'] == '/lyon':
+        if os.environ['REQUEST_URI'] == '/lyon/':
             CITY = "Lyon"
             TEL='0033478284789'
             line = Queue('ovhtel-17862213-1', TEL)
-        elif os.environ['REQUEST_URI'] == '/lille':
+        elif os.environ['REQUEST_URI'] == '/lille/':
             CITY = "Lille"
             TEL='0033320543514'
             line = Redirect('ovhtel-15669832-1', TEL, '0033972366112')

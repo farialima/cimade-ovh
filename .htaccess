@@ -3,8 +3,8 @@ DirectoryIndex index.html
 RewriteEngine on
 
 
-RewriteRule ^lyon$  index.py [L]
-RewriteRule ^lille$ index.py [L]
+RewriteRule ^lyon/$  index.py [L]
+RewriteRule ^lille/$ index.py [L]
 
 
 RewriteRule ^ovh.conf$ https://permtel.farialima.net/ [R=301,L]

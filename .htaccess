@@ -1,6 +1,11 @@
-DirectoryIndex index.py
+DirectoryIndex index.html
 
 RewriteEngine on
-RewriteCond %{REQUEST_URI} !=/index.py
-RewriteCond %{REQUEST_URI} !=/
-RewriteRule (.*) https://permtel.farialima.net/ [R=301,L]
+
+
+RewriteRule ^lyon$  index.py [L]
+RewriteRule ^lille$ index.py [L]
+
+
+RewriteRule ^ovh.conf$ https://permtel.farialima.net/ [R=301,L]
+#RewriteRule ^index.py$ https://permtel.farialima.net/ [R=301,L]

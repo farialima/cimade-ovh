@@ -21,29 +21,54 @@ import ovh
 client = ovh.Client(config_file='./ovh.conf')
 
 
-BILLING_ACCOUNT = 'ovhtel-15669832-1'
-SERVICE_NAME = '0033320543514'
-CITY = "Lille"
+class Redirect:
+    def __init__(self, billing_account, service_name, sip):    
+        self.sip = f'/telephony/{billing_account}/line/{sip}/options'
+        # some verifications
+        redirect_info = client.get(f'/telephony/{billing_account}/redirect/{service_name}')
+        if ("destination" not in redirect_info
+            or 'featureType' not in redirect_info
+            or redirect_info['featureType'] != 'redirect'):
+              raise Exception(f'Line {service_name} not configured for redirection')
+        if redirect_info['destination'] != sip:
+              raise Exception(f'Line {service_name} is redirected to {redirect_info["destination"]} instead of {sip}')
 
-BILLING_ACCOUNT = 'ovhtel-17862213-1'
-SERVICE_NAME = '0033478284789'
-CITY = "Lyon"
-
-class Service:
-    def __init__(self, billing_account, service_name):
-        self.service = f'/telephony/{billing_account}/{self.SERVICE}/{service_name}'
+    def calls(self):
+        return None, None
+    
+    def set_agent(self, number):
+        client.put(self.sip,
+                       forwardUnconditional=true,
+                       forwardUnconditionalNumber=number)
+    def start_perm(self):
+        # nothing to do -- all in set_agent
+        pass
+    
+    def stop_perm(self):
+        self.delete_all_agents()
         
-class Queue(Service):
-    SERVICE = 'easyHunting'
+    def is_started(self):
+        return self.get_active_agent() != None
+    
+    def get_active_agent(self):
+        agent = client.get(self.sip)
+        if agent['forwardUnconditional']:
+            return agent['forwardUnconditionalNumber']
+        
+    def delete_all_agents(self):
+        # there's only one agent...
+        client.put(self.sip,
+                       forwardUnconditional=false)
+        
+class Queue:
     def __init__(self, billing_account, service_name):
-        super(Queue, self).__init__(billing_account, service_name)
+        self.service = f'/telephony/{billing_account}/easyHunting/{service_name}'
         self.queue_name = self.service + '/hunting/queue/'
         self.agent = self.service + '/hunting/agent/'
         self.conditions = self.service + '/timeConditions/conditions'
-        
         queues = client.get(self.queue_name)
         if len(queues) != 1:
-            raise Exception("error, not one queue: " + repr(self.queues))
+            raise Exception("error, not one queue: " + repr(queues))
         self.queueId = queues[0]
 
     def calls(self):
@@ -94,7 +119,7 @@ class Queue(Service):
     def get_active_agent(self):
         for agent in self._agents():
             if agent['status'] != 'loggedOut':
-                return agent
+                return agent['number']
 
     def set_agent(self, number):
         agent_id = None
@@ -123,13 +148,11 @@ class Queue(Service):
                         queueId=self.queueId)
             #print(f'created as {agent_id} and enabled')
 
-    def delete_conditions(self):
+    def delete_all_agents(self):
         conditions = client.get(self.conditions)
         for conditionId in conditions:
             condition_details = client.delete(self.conditions + f'/{conditionId}')
             print(condition_details)
-
-line = Queue(BILLING_ACCOUNT, SERVICE_NAME)
 
 WEEKDAYS = [
     'monday',
@@ -186,6 +209,7 @@ def format_tel(tel):
 
 _french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
 
+
 def do_page():
 
     print("Content-type: text/html\n\n")
@@ -193,12 +217,28 @@ def do_page():
     def print_html(message):
         print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
 
+    try:
+        if os.environ['REQUEST_URI'] == '/lyon':
+            CITY = "Lyon"
+            TEL='0033478284789'
+            line = Queue('ovhtel-17862213-1', TEL)
+        elif os.environ['REQUEST_URI'] == '/lille':
+            CITY = "Lille"
+            TEL='0033320543514'
+            line = Redirect('ovhtel-15669832-1', TEL, '0033972366112')
+        else:
+            raise Exception("No city")
+    except Exception as e:
+        print(e)
+        return
+        
+        
     tel = ''
     now = french_datetime()
     print_html(f'''<html>
 <body>
 <h1>Permanences T&eacute;l&eacute;phoniques Cimade {CITY}</h1>
-<p><b>Cette page est pour {CITY} sur le num&eacute;ro {_french_call(SERVICE_NAME)}.</b><br/>
+<p><b>Cette page est pour {CITY} sur le num&eacute;ro {_french_call(TEL)}.</b><br/>
 <i>Pour la liste des villes, allez <a href="/">ici</a></i></p>
 <p><i>Page actualisée le {now}. <a href="./">Actualiser cette page</a></i></p>
 ''')
@@ -240,26 +280,30 @@ def do_page():
         if not agent:
             print_html("(pas de num&eacute;ro de réponse))")
         else:
-            print_html(_french_call(agent['number']))
+            print_html(_french_call(agent))
     print_html("<br/><br/>")
 
     waiting_calls, answered_calls = line.calls()
     _time = lambda date: ' à ' + date[11:16]
-    print_html("<b>Appel en cours :&nbsp;</b>")
-    if answered_calls:
-        call = answered_calls[0]
-        print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
-                       + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
+    if answered_calls != None:
+        print_html("<b>Appel en cours :&nbsp;</b>")
+        if answered_calls:
+            call = answered_calls[0]
+            print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
+                           + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
+        else:
+            print("Pas d'appel")
+        print("<br/><br/>")
+    if waiting_calls == None:
+        print("<b><i>Pas de file d'attente d'appels</i></b>\n")        
     else:
-        print("Pas d'appel")
-    print("<br/><br/>")
-    print("<b>Appels en attente :</b>\n")
-    if waiting_calls:
-        for call in waiting_calls:
-            print(" <br/>\n")
-            print_html("du " + _french_call(call['callerIdNumber']) + _time(call['begin']))
-    else:
-        print("Pas d'appels")
+        print("<b>Appels en attente :</b>\n")
+        if waiting_calls:
+            for call in waiting_calls:
+                print(" <br/>\n")
+                print_html("du " + _french_call(call['callerIdNumber']) + _time(call['begin']))
+        else:
+            print("Pas d'appels")
 
     if is_started:
         print_html('<h2>Changer de num&eacute;ro</h2>')
@@ -272,13 +316,18 @@ Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input 
 <input type="submit" value="R&eacute;pondre sur ce num&eacute;ro"/>
 </form>
 ''')
-    #print(os.environ)
+
     if is_started:
         print_html(f'''
 <h2>Terminer la permanence</h2>
 <form action="." method="POST"> 
 Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
+''')
+        if answered_calls != None:
+            print_html(f'''
 <p style="color:red">Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.</p>
+''')
+        print_html(f'''
 </form>
 ''')
     print_html('''
@@ -288,4 +337,4 @@ Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la p
 
 do_page()
         
-#client.delete_conditions()
+#client.delete_all_agents()

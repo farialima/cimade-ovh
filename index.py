@@ -176,15 +176,6 @@ except:
             return False
         return True
 
-def notify(message):
-    msg = EmailMessage()
-    msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
-    msg['From'] = "faria@john-adams.dreamhost.com"
-    msg['To'] = "ovh-notification@farialima.net"
-    msg['Subject'] = f"Permtel notification pour {CITY}"
-    
-    subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
-
 def french_datetime():
     import locale
     current_locale = locale.getlocale()[0]
@@ -209,7 +200,6 @@ def format_tel(tel):
 
 _french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
 
-
 def do_page():
 
     print("Content-type: text/html\n\n")
@@ -217,6 +207,16 @@ def do_page():
     def print_html(message):
         print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
 
+    CITY = 'Undefined'
+    def notify(message):
+        msg = EmailMessage()
+        msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
+        msg['From'] = "faria@john-adams.dreamhost.com"
+        msg['To'] = "ovh-notification@farialima.net"
+        msg['Subject'] = f"Permtel notification pour {CITY}"
+    
+        subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
+        
     try:
         if os.environ['REQUEST_URI'] == '/lyon':
             CITY = "Lyon"
@@ -230,8 +230,8 @@ def do_page():
             raise Exception("No city")
     except Exception as e:
         print(e)
+        notify(str(e))
         return
-        
         
     tel = ''
     now = french_datetime()

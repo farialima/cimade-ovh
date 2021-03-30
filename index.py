@@ -20,20 +20,116 @@ import ovh
 
 client = ovh.Client(config_file='./ovh.conf')
 
+
+BILLING_ACCOUNT = 'ovhtel-15669832-1'
+SERVICE_NAME = '0033320543514'
+CITY = "Lille"
+
 BILLING_ACCOUNT = 'ovhtel-17862213-1'
 SERVICE_NAME = '0033478284789'
+CITY = "Lyon"
 
-SERVICE = f'/telephony/{BILLING_ACCOUNT}/easyHunting/{SERVICE_NAME}'
-QUEUE = SERVICE + '/hunting/queue/'
-AGENT = SERVICE + '/hunting/agent/'
-CONDITIONS = SERVICE + '/timeConditions/conditions'
+class Service:
+    def __init__(self, billing_account, service_name):
+        self.service = f'/telephony/{billing_account}/{self.SERVICE}/{service_name}'
+        
+class Queue(Service):
+    SERVICE = 'easyHunting'
+    def __init__(self, billing_account, service_name):
+        super(Queue, self).__init__(billing_account, service_name)
+        self.queue_name = self.service + '/hunting/queue/'
+        self.agent = self.service + '/hunting/agent/'
+        self.conditions = self.service + '/timeConditions/conditions'
+        
+        queues = client.get(self.queue_name)
+        if len(queues) != 1:
+            raise Exception("error, not one queue: " + repr(self.queues))
+        self.queueId = queues[0]
 
-_queue = client.get(QUEUE)
-if len(_queue) != 1:
-    print("error, not one queue: " + repr(_queue))
-    exit(1)
+    def calls(self):
+        queue = self.queue_name + f'{self.queueId}'
+        calls = [ client.get(queue + f'/liveCalls/{id}') for id in sorted(client.get(queue + '/liveCalls')) ]
+        waiting_calls = [ call for call in calls if call['state'] == 'Waiting' ]
+        answered_calls = [ call for call in calls if  call['state'] == 'Answered' ]
+        return waiting_calls, answered_calls
+    
+    def start_perm(self):
+        tz = pytz.timezone('Europe/Paris')
+        day = WEEKDAYS[datetime.now(tz).weekday()].lower()
+        try:
+            client.post(self.conditions,
+                        timeFrom="02:00:00",
+                        timeTo="23:59:59",
+                        weekDay=day,
+                        policy="available")
+        except ovh.exceptions.BadParametersError as e:
+            print(e)
 
-queueId = _queue[0]
+    def stop_perm(self):
+        try:
+            condition = self._condition()
+            if not condition:
+                raise Exception("Perm not started")
+            # {'timeFrom': '19:00:00', 'policy': 'available', 'timeTo': '23:59:59', 'weekDay': 'sunday', 'conditionId': 2692226}
+            conditionId = condition['conditionId']
+
+            #print(f'Deleting: {conditionId}')
+            client.delete(self.conditions + f'/{conditionId}')
+        except ovh.exceptions.BadParametersError as e:
+            print(e)
+
+    def is_started(self):
+        return self._condition() != None
+    
+    def _condition(self):
+        conditions = client.get(self.conditions)
+        for conditionId in conditions:
+            condition_details = client.get(self.conditions + f'/{conditionId}')
+            if condition_details['timeTo'] == '23:59:59':
+                return condition_details
+
+    def _agents(self):
+        return [ client.get(self.agent + str(agent)) for agent in sorted(client.get(self.agent)) ]
+    
+    def get_active_agent(self):
+        for agent in self._agents():
+            if agent['status'] != 'loggedOut':
+                return agent
+
+    def set_agent(self, number):
+        agent_id = None
+        for agent in self._agents():
+            if agent['number'] == number:
+                agent_id = agent['agentId']
+            elif agent['status'] != 'loggedOut':
+                #print('Disabling ' + agent['number'])
+                client.put(self.agent + str(agent['agentId']), status='loggedOut')
+        if agent_id:
+            #print('Enabling ' + number)
+            client.put(self.agent + str(agent_id), status='available')
+        else:
+            #print(f'Agent for number {number} not found, creating and enabling it...')
+            result = client.post(self.agent,
+                                 description='(no known name)',
+                                 number=number,
+                                 simultaneousLines=1,
+                                 status='available',
+                                 timeout=10,
+                                 wrapUpTime=0
+            )
+            agent_id = result['agentId']
+            client.post(self.agent + f'{agent_id}/queue?queueId={self.queueId}',
+                        position=0,
+                        queueId=self.queueId)
+            #print(f'created as {agent_id} and enabled')
+
+    def delete_conditions(self):
+        conditions = client.get(self.conditions)
+        for conditionId in conditions:
+            condition_details = client.delete(self.conditions + f'/{conditionId}')
+            print(condition_details)
+
+line = Queue(BILLING_ACCOUNT, SERVICE_NAME)
 
 WEEKDAYS = [
     'monday',
@@ -62,7 +158,7 @@ def notify(message):
     msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
     msg['From'] = "faria@john-adams.dreamhost.com"
     msg['To'] = "ovh-notification@farialima.net"
-    msg['Subject'] = "Permtel notification"
+    msg['Subject'] = f"Permtel notification pour {CITY}"
     
     subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
 
@@ -90,73 +186,6 @@ def format_tel(tel):
 
 _french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
 
-def start_perm():
-    tz = pytz.timezone('Europe/Paris')
-    day = WEEKDAYS[datetime.now(tz).weekday()].lower()
-    try:
-        client.post(CONDITIONS,
-                    timeFrom="02:00:00",
-                    timeTo="23:59:59",
-                    weekDay=day,
-                    policy="available")
-    except ovh.exceptions.BadParametersError as e:
-        print(e)
-
-def get_condition():
-    conditions = client.get(CONDITIONS)
-    for conditionId in conditions:
-        condition_details = client.get(CONDITIONS + f'/{conditionId}')
-        if condition_details['timeTo'] == '23:59:59':
-            return condition_details
-
-def get_active_agent():
-    agents = [ client.get(AGENT + str(agent)) for agent in sorted(client.get(AGENT)) ]
-    for agent in agents:
-        if agent['status'] != 'loggedOut':
-            return agent
-
-def set_agent(number):
-    agent_id = None
-    agents = [ client.get(AGENT + str(agent)) for agent in sorted(client.get(AGENT)) ]
-    for agent in agents:
-        if agent['number'] == number:
-            agent_id = agent['agentId']
-        elif agent['status'] != 'loggedOut':
-            #print('Disabling ' + agent['number'])
-            client.put(AGENT + str(agent['agentId']), status='loggedOut')
-    if agent_id:
-        #print('Enabling ' + number)
-        client.put(AGENT + str(agent_id), status='available')
-    else:
-        #print(f'Agent for number {number} not found, creating and enabling it...')
-        result = client.post(AGENT,
-                             description='(no known name)',
-                             number=number,
-                             simultaneousLines=1,
-                             status='available',
-                             timeout=10,
-                             wrapUpTime=0
-        )
-        agent_id = result['agentId']
-        client.post(AGENT + f'{agent_id}/queue?queueId={queueId}',
-                    position=0,
-                    queueId=queueId)
-        #print(f'created as {agent_id} and enabled')
-
-        
-def stop_perm():
-    try:
-        condition = get_condition()
-        if not condition:
-            raise Exception("Current condition not found")
-        # {'timeFrom': '19:00:00', 'policy': 'available', 'timeTo': '23:59:59', 'weekDay': 'sunday', 'conditionId': 2692226}
-        conditionId = condition['conditionId']
-
-        #print(f'Deleting: {conditionId}')
-        client.delete(CONDITIONS + f'/{conditionId}')
-    except ovh.exceptions.BadParametersError as e:
-        print(e)
-
 def do_page():
 
     print("Content-type: text/html\n\n")
@@ -168,8 +197,10 @@ def do_page():
     now = french_datetime()
     print_html(f'''<html>
 <body>
-<h1>Permanences T&eacute;l&eacute;phoniques Cimade Lyon</h1>
-<p><i>Page actualisée le {now}. <a href="/index.py">Actualiser cette page</a></i></p>
+<h1>Permanences T&eacute;l&eacute;phoniques Cimade {CITY}</h1>
+<p><b>Cette page est pour {CITY} sur le num&eacute;ro {_french_call(SERVICE_NAME)}.</b><br/>
+<i>Pour la liste des villes, allez <a href="/">ici</a></i></p>
+<p><i>Page actualisée le {now}. <a href="./">Actualiser cette page</a></i></p>
 ''')
 
     if ('REQUEST_METHOD' in os.environ and os.environ['REQUEST_METHOD'] == 'POST'):
@@ -179,19 +210,19 @@ def do_page():
             if 'tel' in multiform:
                 tel = html.unescape(multiform['tel'][0]) # unescape needed because when copy/pasting on Safari, getting chars like "&#8236;" !!
                 number = format_tel(tel)
-                set_agent(number)
-                start_perm()
+                line.set_agent(number)
+                line.start_perm()
                 print_html(f'<p style="color: blue">Permanence commencée sur le numéro {tel}</p>')
                 notify(f'Permanence commencée sur le numéro {tel}')
             else:
-                stop_perm()
+                line.stop_perm()
                 print_html(f'<p style="color: blue">Permanence terminée</p>')
                 notify('Permanence terminée')
            
         except Exception as e:
             print_html(f'''<p style="color: red">Erreur: {e}</p>
 <p>Si probl&egrave;me, contactez François au 06 99 12 47 55</p>
-<p><i><a href="/index.py">Actualiser cette page</a></i></p>
+<p><i><a href="./">Actualiser cette page</a></i></p>
 </body>
 </html>''')
             notify(f'error when setting permanence: {e}')
@@ -199,24 +230,20 @@ def do_page():
 
     print('''<h2>&Eacute;tat actuel</h2>''')
     
-    condition = get_condition()
+    is_started = line.is_started()
     print_html("<b>Permanence en cours :</b>")
-    if not condition:
+    if not is_started:
         print_html("Pas de permanence en cours<br/>")
     else:
         print_html(" répondue par&nbsp;: ")
-        agent = get_active_agent()
+        agent = line.get_active_agent()
         if not agent:
             print_html("(pas de num&eacute;ro de réponse))")
         else:
             print_html(_french_call(agent['number']))
     print_html("<br/><br/>")
-                           
-    queue = QUEUE + f'{queueId}'
-    calls = [ client.get(queue + f'/liveCalls/{id}') for id in sorted(client.get(queue + '/liveCalls')) ]
-    waiting_calls = [ call for call in calls if call['state'] == 'Waiting' ]
-    answered_calls = [ call for call in calls if  call['state'] == 'Answered' ]
 
+    waiting_calls, answered_calls = line.calls()
     _time = lambda date: ' à ' + date[11:16]
     print_html("<b>Appel en cours :&nbsp;</b>")
     if answered_calls:
@@ -234,21 +261,22 @@ def do_page():
     else:
         print("Pas d'appels")
 
-    if condition:
+    if is_started:
         print_html('<h2>Changer de num&eacute;ro</h2>')
     else:
         print_html('<h2>D&eacute;marrer la permanence</h2>')
         
     print_html(f'''
-<form action="index.py" method="POST"> 
+<form action="." method="POST"> 
 Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input name="tel" value="{tel}"/><br/>
 <input type="submit" value="R&eacute;pondre sur ce num&eacute;ro"/>
 </form>
 ''')
-    if condition:
+    #print(os.environ)
+    if is_started:
         print_html(f'''
 <h2>Terminer la permanence</h2>
-<form action="index.py" method="POST"> 
+<form action="." method="POST"> 
 Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
 <p style="color:red">Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.</p>
 </form>
@@ -259,10 +287,5 @@ Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la p
 ''')
 
 do_page()
-def delete_conditions():
-    conditions = client.get(CONDITIONS)
-    for conditionId in conditions:
-        condition_details = client.delete(CONDITIONS + f'/{conditionId}')
-        print(condition_details)
         
-#delete_conditions()
+#client.delete_conditions()

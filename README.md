@@ -4,7 +4,7 @@ Page web très simple pour que les utilisateurs definissent eux-même les renvoi
 
 ## Contexte
 
-Le groupe informatique Cimade semble un peu débordée pour gérer les demandes de changement de ligne, de renvoi d’appel, etc. Donc le but est de rendre plus autonomes les groupes locaux de la Cimade, pour qu'ils gèrent leurs permanences téléphoniques eux-mêmes.
+Le groupe informatique Cimade semble un peu débordé pour gérer les demandes de changement de ligne, de renvoi d’appel, etc. Donc le but est de rendre plus autonomes les groupes locaux de la Cimade, pour qu'ils gèrent leurs permanences téléphoniques eux-mêmes.
 
 Mais faire utiliser le site d’administration OVH ( https://www.ovh.com/manager/ ) par les groupes locaux, ou même par les permanents régionaux, n’est pas simple :
 -  ce site est difficile à utiliser, cela demande un apprentissage important : la UI est complexe, et il y a des petites subtilités (bugs de rafraîchissement…)
@@ -29,7 +29,7 @@ contient :
 
 ## Installation
 
-Le site peut tourner sur un serveur Apache avec FastGCI et Python 3. Installer les lib tierces de `requirements.txt`. Il faut créer un fichier ‘ovh.conf” basé sur ovh-example.conf et y ajouter un ’token' générée avec create_consumer_key.py. On peut créer une ’token’ à durée de vie illimité.
+Le site peut tourner sur un serveur Apache avec FastGCI et Python 3. Installer les lib tierces de `requirements.txt`. Il faut créer un fichier `ovh.conf` basé sur `ovh-example.conf` et y ajouter un ’token' générée avec `create_consumer_key.py`. On peut créer une ’token’ à durée de vie illimité.
 
 ## Configuration des lignes
 

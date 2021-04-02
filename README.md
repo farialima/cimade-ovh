@@ -38,7 +38,7 @@ La configuration est pour l’instant codée en dur dans le Python : dans les li
 Pour ajouter un groupe local, il faut donc :
 - sur https://www.ovh.com/manager/ , créer une file d’attente, défini les messages voix, etc..(pour utiliser `Queue`) ; ou rediriger une ligne externe vers un poste SIP (pour utiliser `Redirect`)
 - éditer index.html pour ajouter un groupe local. Il suffit de mettre un lien vers une sous-page (virtuelle, similaire à “/lyon/“ ou “/lille/“. Il faut y mettre un “/“ final.
-- éditer index.py pour ajouter la configuration (dans les lignes ~250). C’est très simple si on connait un peu de Python, juste copier Lyon ou Paris
+- éditer index.py pour ajouter la configuration (dans les lignes ~250). C’est très simple si on connait un peu de Python, juste copier Lyon ou Lille
 
 ## Historique et notes retour d'expérience
 

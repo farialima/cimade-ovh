@@ -9,6 +9,7 @@ import sys
 from urllib.parse import parse_qs
 import html
 import re
+import locale
 from datetime import datetime
 import subprocess
 from email.message import EmailMessage
@@ -18,13 +19,65 @@ from html import escape
 import pytz
 import ovh
 
+WEEKDAYS = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+    ]
+
+try:
+    # python >= 3.7
+    isascii = str.isascii
+except:
+    def isascii(string):
+        try:
+            string.encode('ascii')
+        except UnicodeEncodeError:
+            return False
+        return True
+
+def french_datetime():
+    current_locale = locale.getlocale()[0]
+    try:
+        locale.setlocale(locale.LC_TIME, "fr_FR")
+        tz = pytz.timezone('Europe/Paris')
+        now = datetime.now(tz)
+        return now.strftime("%A %d %b %Y à %H:%M:%S")
+    finally:
+        locale.setlocale(locale.LC_TIME, current_locale)
+    
+def format_tel(tel):
+    number = tel.replace(' ', '').replace('-', '')
+    if not isascii(number) or not number.isnumeric():
+        raise Exception("Le numéro de téléphone doit n'avoir que des chiffres : " + repr(tel)) 
+    if len(number) != 10:
+        raise Exception("Le numéro de téléphone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
+    if not number.startswith("0"):
+        raise Exception("Le numéro de téléphone doit commencer par un zero")
+    
+    return "0033" + number[1:]
+
+_french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
+
+def print_html(message):
+    print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
+
 
 APPLICATION_ID=126066
+
 class Client(ovh.Client):
-    def __init__(self):
+    def __init__(self, service_name):
         super(Client, self).__init__(config_file='./ovh.conf')
+        self.service_name = service_name
         self.check_credentials()
-        
+
+    def get_tel(self):
+        return _french_call(self.service_name)
+
     def check_credentials(self):
         # this is not really needed since we use unlimited token... but I wrote it so I leave it :)
         max_expiration_dates = max(
@@ -42,17 +95,14 @@ Contactez François au 06 99 12 47 55 ou <a href="mailto:francois@granade.com">f
 
         
 class Redirect(Client):
-    def __init__(self, billing_account, service_name, sip):
-        super(Redirect, self).__init__()
-        self.sip = f'/telephony/{billing_account}/line/{sip}/options'
-        # some verifications
+    def __init__(self, billing_account, service_name):
+        super(Redirect, self).__init__(service_name)
         redirect_info = self.get(f'/telephony/{billing_account}/redirect/{service_name}')
         if ("destination" not in redirect_info
             or 'featureType' not in redirect_info
             or redirect_info['featureType'] != 'redirect'):
               raise Exception(f'Line {service_name} not configured for redirection')
-        if redirect_info['destination'] != sip:
-              raise Exception(f'Line {service_name} is redirected to {redirect_info["destination"]} instead of {sip}')
+        self.sip = f'/telephony/{billing_account}/line/{redirect_info["destination"]}/options'
 
     def calls(self):
         return None, None
@@ -83,7 +133,7 @@ class Redirect(Client):
         
 class Queue(Client):
     def __init__(self, billing_account, service_name):
-        super(Queue, self).__init__()
+        super(Queue, self).__init__(service_name)
         self.service = f'/telephony/{billing_account}/easyHunting/{service_name}'
         self.queue_name = self.service + '/hunting/queue/'
         self.agent = self.service + '/hunting/agent/'
@@ -176,58 +226,7 @@ class Queue(Client):
             condition_details = self.delete(self.conditions + f'/{conditionId}')
             print(condition_details)
 
-WEEKDAYS = [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-    ]
 
-
-try:
-    # python >= 3.7
-    isascii = str.isascii
-except:
-    def isascii(string):
-        try:
-            string.encode('ascii')
-        except UnicodeEncodeError:
-            return False
-        return True
-
-def french_datetime():
-    import locale
-    current_locale = locale.getlocale()[0]
-    try:
-        locale.setlocale(locale.LC_TIME, "fr_FR")
-        tz = pytz.timezone('Europe/Paris')
-        now = datetime.now(tz)
-        return now.strftime("%A %d %b %Y à %H:%M:%S")
-    finally:
-        locale.setlocale(locale.LC_TIME, current_locale)
-    
-def format_tel(tel):
-    number = tel.replace(' ', '').replace('-', '')
-    if not isascii(number) or not number.isnumeric():
-        raise Exception("Le numéro de téléphone doit n'avoir que des chiffres : " + repr(tel)) 
-    if len(number) != 10:
-        raise Exception("Le numéro de téléphone doit avoir 10 chiffres, reçu : " + "".join([repr(c).replace("'", '') for c in number]))
-    if not number.startswith("0"):
-        raise Exception("Le numéro de téléphone doit commencer par un zero")
-    
-    return "0033" + number[1:]
-
-_french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
-
-def print_html(message):
-    print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
-
-
-CITY = os.environ['REQUEST_URI'].replace('/', '').capitalize() or 'Undefined'
-    
 def notify(message):
     msg = EmailMessage()
     msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
@@ -238,23 +237,23 @@ def notify(message):
     subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
 
 
+CITY = os.environ['REQUEST_URI'].replace('/', '').capitalize() or 'Undefined'
+
+
 def do_page():
 
     print("Content-type: text/html\n\n")
-
     print_html(f'''<html>
 <body>
 ''')
+
     try:
         if CITY == "Lyon":
-            TEL='0033478284789'
-            line = Queue('ovhtel-17862213-1', TEL)
+            line = Queue('ovhtel-17862213-1', '0033478284789')
         elif CITY == "Lille":
-            TEL='0033320543514'
-            line = Redirect('ovhtel-15669832-1', TEL, '0033972366112')
+            line = Redirect('ovhtel-15669832-1', '0033320543514')
         else:
-            print_html('''<html>
-<body>
+            print_html('''
   <h1>Permanences T&eacute;l&eacute;phoniques Cimade</h1>
   <p>Choisissez votre ville :</p>
     <p><a href="/lyon">Lyon</a></p>
@@ -270,7 +269,7 @@ def do_page():
     tel = ''
     now = french_datetime()
     print_html(f'''<h1>Permanences T&eacute;l&eacute;phoniques Cimade {CITY}</h1>
-<p><b>Cette page est pour {CITY} sur le num&eacute;ro {_french_call(TEL)}.</b><br/>
+<p><b>Cette page est pour {CITY} sur le num&eacute;ro {line.get_tel()}.</b><br/>
 <i>Pour la liste des villes, allez <a href="/">ici</a></i></p>
 <p><i>Page actualisée le {now}. <a href="./">Actualiser cette page</a></i></p>
 ''')
@@ -346,7 +345,7 @@ def do_page():
         print_html('<h2>D&eacute;marrer la permanence</h2>')
         
     print_html(f'''
-<form action="." method="POST"> 
+<form action="" method="POST"> 
 Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input name="tel" value="{tel}"/><br/>
 <input type="submit" value="R&eacute;pondre sur ce num&eacute;ro"/>
 </form>
@@ -355,11 +354,11 @@ Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input 
     if is_started:
         print_html(f'''
 <h2>Terminer la permanence</h2>
-<form action="." method="POST"> 
+<form action="" method="POST"> 
 <input type="hidden" name="finish" value="yes"/>
 Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
 ''')
-        if answered_calls != None:
+        if waiting_calls != None:
             print_html(f'''
 <p style="color:red">Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.</p>
 ''')
@@ -372,5 +371,7 @@ Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la p
 ''')
 
 do_page()
-        
+
+
+# for maintenance..
 #client.delete_all_agents()

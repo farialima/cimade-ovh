@@ -51,7 +51,7 @@ Je voulais avoir un mécanisme automatique, et non pas avoir à faire des change
 
 La difficulté a été, comme souvent, que OVH est très puissant, mais parfois un peu “buggy” ou tout au moins bizarre dans ses comportements. En particulier, les renvois extérieurs ne marchent bien que si ils sont définis avant le début de la période d’activité, mais surtout pas pendant. J’ai eu aussi des comportements bizarres quand il y a réellement une file d’attente…. à voir.
 
-D'abord, j'ai mis en place fichier texte avec un format qui definissaient les permanences sur une semaine, et un cron job pour les commencer/terminer. Mais ce mécanisme demandait trop de gestion quotidiennes : les GL changent souvent.. Ce code est encore dans l’historique Git.
+D'abord, j'ai mis en place fichier texte avec un format qui definissaient les permanences sur une semaine, et un cron job pour les commencer/terminer. Mais ce mécanisme demandait trop de gestion quotidiennes : les GL changent souvent. Ce code est encore dans l’historique Git.
 
 En attendant, les résultats :
 
@@ -63,12 +63,17 @@ Il vaut mieux que les benevoles utilisent une ligne mobile que fixe : il y a sou
 
 - L’idée est aussi de collecter des statistiques sur les appels. Si OVH n’a pas de moyens direct d’en collecter (nombre d’appels abandonnés, nombre d’appel pris, durée moyenne d’attente…), me permettra d’en générer assez simplement.
 
-- je n’ai pas configuré plusieurs lignes en même temps (avoir une “vrai” file d’attente) parce que finalement, les bénévoles n’ont pas souhaté le faire — ils ont préféré avoir une seule personne… je pense que ça marcherait (voir bug ci-dessus).
+- je n’ai pas configuré plusieurs lignes en même temps (avoir plusieurs bénévoles qui répondent, chacun à un appel) parce que finalement, les bénévoles n’ont pas souhaité le faire — ils ont préféré avoir une seule personne. Mais ce serait facile à faire.
 
-De plus, j'ai depuis decouverts que Aulnay n'utilise pas les file d'attente pour faire les renvoi, et ca marche tres bien. Il n'y a donc probablement pas besoin de file d'attente, contrairement a ce que le tutorial fourni par la Cimade national disait !! Donc on pourrait simplifier.
+- pour que les appels soient pris par deux bénévoles à la fois (appel à trois “automatique”), en particulier pour que des bénévoles en cours de formation puissent participer aux appels, une solution qui marche : 
+  * faire une file d'appel, pour que les appels soient transmis un-par-un
+  * faire une conférence ; ca n'est pas possible avec OVH il semble, mais c'est facile par exemple sur Twillio (il faut acheter un numéro mais c'est quelques euros par mois ; et ensuite définir un "TwiML Bin" qui contiennent juste la connection à une conférence :
+```
+<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference>Permanence Cimade</Conference></Dial></Response>
+```
+(Voir la doc sur https://www.twilio.com/docs/voice/twiml/conference et https://www.twilio.com/docs/voice/api/conference-resource )
 
-- il serait souhaitable que des appels soient pris par deux bénévoles à la fois (appel à trois “automatique”), en particulier pour que des bénévoles en cours de formation puissent participer aux appels, mais cela ne semble pas possible - si vous connaissez, je suis preneur (Thierry ?)
+Cela marche, on s'en est servi : la seule complexité est qu'il faut que les gens qui appellent racrochent eux-même, pour que l'appel suivant soit transmis. Et aussi, il est transmis immediatement, donc pas de pause :). 
 
 - le support ‘premium’ OVH est tout à fait bien :)
 
-Si vous avez besoin, pour votre groupe local, de quelque aide, n’hésitez pas à me contacter

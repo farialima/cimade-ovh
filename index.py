@@ -18,14 +18,33 @@ from html import escape
 import pytz
 import ovh
 
-client = ovh.Client(config_file='./ovh.conf')
 
+APPLICATION_ID=126066
+class Client(ovh.Client):
+    def __init__(self):
+        super(Client, self).__init__(config_file='./ovh.conf')
+        self.check_credentials()
+        
+    def check_credentials(self):
+        max_expiration_dates = max(
+            datetime.strptime(self.get('/me/api/credential/'+str(id))['expiration'].split('T')[0],
+                                  '%Y-%m-%d').date()
+            for id in self.get('/me/api/credential', applicationId=APPLICATION_ID))
+        remaining = (max_expiration_dates - datetime.now().date()).days
+        if (remaining < 7):
+            notify(f"Les credentials vont expirer dans {remaining} jours !!!")
+        if (remaining < 2):
+            print_html(f'''<p style="color: red">Attention: les permissions d'acc&egrave;s &agrave; pour cette page vont expirer dans {remaining} jour(s) - ensuite cette page ne fonctionnera plus !<br/>
+Contactez François au 06 99 12 47 55 ou <a href="mailto:francois@granade.com">francois@granade.com</a> pour qu'il les renouvelle</p>
+''')
 
-class Redirect:
-    def __init__(self, billing_account, service_name, sip):    
+        
+class Redirect(Client):
+    def __init__(self, billing_account, service_name, sip):
+        super(Redirect, self).__init__()
         self.sip = f'/telephony/{billing_account}/line/{sip}/options'
         # some verifications
-        redirect_info = client.get(f'/telephony/{billing_account}/redirect/{service_name}')
+        redirect_info = self.get(f'/telephony/{billing_account}/redirect/{service_name}')
         if ("destination" not in redirect_info
             or 'featureType' not in redirect_info
             or redirect_info['featureType'] != 'redirect'):
@@ -37,7 +56,7 @@ class Redirect:
         return None, None
     
     def set_agent(self, number):
-        client.put(self.sip,
+        self.put(self.sip,
                        forwardUnconditional=True,
                        forwardUnconditionalNumber=number)
     def start_perm(self):
@@ -51,29 +70,30 @@ class Redirect:
         return self.get_active_agent() != None
     
     def get_active_agent(self):
-        agent = client.get(self.sip)
+        agent = self.get(self.sip)
         if agent['forwardUnconditional']:
             return agent['forwardUnconditionalNumber']
         
     def delete_all_agents(self):
         # there's only one agent...
-        client.put(self.sip,
+        self.put(self.sip,
                        forwardUnconditional=False)
         
-class Queue:
+class Queue(Client):
     def __init__(self, billing_account, service_name):
+        super(Queue, self).__init__()
         self.service = f'/telephony/{billing_account}/easyHunting/{service_name}'
         self.queue_name = self.service + '/hunting/queue/'
         self.agent = self.service + '/hunting/agent/'
         self.conditions = self.service + '/timeConditions/conditions'
-        queues = client.get(self.queue_name)
+        queues = self.get(self.queue_name)
         if len(queues) != 1:
             raise Exception("error, not one queue: " + repr(queues))
         self.queueId = queues[0]
 
     def calls(self):
         queue = self.queue_name + f'{self.queueId}'
-        calls = [ client.get(queue + f'/liveCalls/{id}') for id in sorted(client.get(queue + '/liveCalls')) ]
+        calls = [ self.get(queue + f'/liveCalls/{id}') for id in sorted(self.get(queue + '/liveCalls')) ]
         waiting_calls = [ call for call in calls if call['state'] == 'Waiting' ]
         answered_calls = [ call for call in calls if  call['state'] == 'Answered' ]
         return waiting_calls, answered_calls
@@ -82,7 +102,7 @@ class Queue:
         tz = pytz.timezone('Europe/Paris')
         day = WEEKDAYS[datetime.now(tz).weekday()].lower()
         try:
-            client.post(self.conditions,
+            self.post(self.conditions,
                         timeFrom="02:00:00",
                         timeTo="23:59:59",
                         weekDay=day,
@@ -99,7 +119,7 @@ class Queue:
             conditionId = condition['conditionId']
 
             #print(f'Deleting: {conditionId}')
-            client.delete(self.conditions + f'/{conditionId}')
+            self.delete(self.conditions + f'/{conditionId}')
         except ovh.exceptions.BadParametersError as e:
             print(e)
 
@@ -107,14 +127,14 @@ class Queue:
         return self._condition() != None
     
     def _condition(self):
-        conditions = client.get(self.conditions)
+        conditions = self.get(self.conditions)
         for conditionId in conditions:
-            condition_details = client.get(self.conditions + f'/{conditionId}')
+            condition_details = self.get(self.conditions + f'/{conditionId}')
             if condition_details['timeTo'] == '23:59:59':
                 return condition_details
 
     def _agents(self):
-        return [ client.get(self.agent + str(agent)) for agent in sorted(client.get(self.agent)) ]
+        return [ self.get(self.agent + str(agent)) for agent in sorted(self.get(self.agent)) ]
     
     def get_active_agent(self):
         for agent in self._agents():
@@ -128,13 +148,13 @@ class Queue:
                 agent_id = agent['agentId']
             elif agent['status'] != 'loggedOut':
                 #print('Disabling ' + agent['number'])
-                client.put(self.agent + str(agent['agentId']), status='loggedOut')
+                self.put(self.agent + str(agent['agentId']), status='loggedOut')
         if agent_id:
             #print('Enabling ' + number)
-            client.put(self.agent + str(agent_id), status='available')
+            self.put(self.agent + str(agent_id), status='available')
         else:
             #print(f'Agent for number {number} not found, creating and enabling it...')
-            result = client.post(self.agent,
+            result = self.post(self.agent,
                                  description='(no known name)',
                                  number=number,
                                  simultaneousLines=1,
@@ -143,15 +163,15 @@ class Queue:
                                  wrapUpTime=0
             )
             agent_id = result['agentId']
-            client.post(self.agent + f'{agent_id}/queue?queueId={self.queueId}',
+            self.post(self.agent + f'{agent_id}/queue?queueId={self.queueId}',
                         position=0,
                         queueId=self.queueId)
             #print(f'created as {agent_id} and enabled')
 
     def delete_all_agents(self):
-        conditions = client.get(self.conditions)
+        conditions = self.get(self.conditions)
         for conditionId in conditions:
-            condition_details = client.delete(self.conditions + f'/{conditionId}')
+            condition_details = self.delete(self.conditions + f'/{conditionId}')
             print(condition_details)
 
 WEEKDAYS = [
@@ -200,48 +220,53 @@ def format_tel(tel):
 
 _french_call = lambda caller: re.sub('^0033', '0', re.sub('^33', '0', caller.strip()))
 
+def print_html(message):
+    print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
+
+
+CITY = os.environ['REQUEST_URI'].replace('/', '').capitalize() or 'Undefined'
+    
+def notify(message):
+    msg = EmailMessage()
+    msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
+    msg['From'] = "faria@john-adams.dreamhost.com"
+    msg['To'] = "ovh-notification@farialima.net"
+    msg['Subject'] = f"Permtel notification pour {CITY}"
+    
+    subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
+
+
 def do_page():
 
     print("Content-type: text/html\n\n")
 
-    def print_html(message):
-        print(message.encode('ascii', 'xmlcharrefreplace').decode('ascii'))
-
-    CITY = 'Undefined'
-    def notify(message):
-        msg = EmailMessage()
-        msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
-        msg['From'] = "faria@john-adams.dreamhost.com"
-        msg['To'] = "ovh-notification@farialima.net"
-        msg['Subject'] = f"Permtel notification pour {CITY}"
-    
-        subprocess.run(["/usr/sbin/sendmail", "-t", "-oi"], input=msg.as_bytes())
-        
+    print_html(f'''<html>
+<body>
+''')
     try:
-        if os.environ['REQUEST_URI'] == '/lyon/':
-            CITY = "Lyon"
+        if CITY == "Lyon":
             TEL='0033478284789'
             line = Queue('ovhtel-17862213-1', TEL)
-        elif os.environ['REQUEST_URI'] == '/lille/':
-            CITY = "Lille"
+        elif CITY == "Lille":
             TEL='0033320543514'
             line = Redirect('ovhtel-15669832-1', TEL, '0033972366112')
         else:
-            raise Exception("No city")
+            print(f'<html><body>Pas de ville s&eacute;lectionn&eacute;, retournez sur la <a href="/">page de s&eacute;lection</a></body></html>')
+            notify('Pas de ville pour ' + str(os.environ['REQUEST_URI']))
+            return
     except Exception as e:
-        print(e)
         notify(str(e))
-        return
-        
+        print(e)
+        raise
+
     tel = ''
     now = french_datetime()
-    print_html(f'''<html>
-<body>
-<h1>Permanences T&eacute;l&eacute;phoniques Cimade {CITY}</h1>
+    print_html(f'''<h1>Permanences T&eacute;l&eacute;phoniques Cimade {CITY}</h1>
 <p><b>Cette page est pour {CITY} sur le num&eacute;ro {_french_call(TEL)}.</b><br/>
 <i>Pour la liste des villes, allez <a href="/">ici</a></i></p>
 <p><i>Page actualisée le {now}. <a href="./">Actualiser cette page</a></i></p>
 ''')
+    
 
     if ('REQUEST_METHOD' in os.environ and os.environ['REQUEST_METHOD'] == 'POST'):
         query_string = sys.stdin.read()
@@ -290,9 +315,9 @@ def do_page():
     if answered_calls != None:
         print_html("<b>Appel en cours :&nbsp;</b>")
         if answered_calls:
-            call = answered_calls[0]
-            print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
-                           + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
+            for call in answered_calls:
+                print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
+                            + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
         else:
             print("Pas d'appel")
         print("<br/><br/>")

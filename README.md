@@ -23,7 +23,6 @@ contient :
  - `ovh-example.conf` modèle pour un `ovh.conf` avec les clés
  - `stats.py` pour collecter des statistiques -- assez basic et approximatif pour l'instant.
  - `index.py` pour configurer les redirections de lignes.
- - `index.html` comme page d'accueil.
  - `.htaccess` pour les redirections des pages
  - `requirements.txt` liste les librairies tierces (avec pip)
 
@@ -37,8 +36,7 @@ La configuration est pour l’instant codée en dur dans le Python : dans les li
 
 Pour ajouter un groupe local, il faut donc :
 - sur https://www.ovh.com/manager/ , créer une file d’attente, défini les messages voix, etc..(pour utiliser `Queue`) ; ou rediriger une ligne externe vers un poste SIP (pour utiliser `Redirect`)
-- éditer index.html pour ajouter un groupe local. Il suffit de mettre un lien vers une sous-page (virtuelle, similaire à “/lyon/“ ou “/lille/“. Il faut y mettre un “/“ final.
-- éditer index.py pour ajouter la configuration (dans les lignes ~250). C’est très simple si on connait un peu de Python, juste copier Lyon ou Lille
+- éditer index.py pour ajouter la configuration (dans les lignes ~250). C’est très simple si on connait un peu de Python, juste copier Lyon ou Lille. Ajouter aussi un lien vers une sous-page (virtuelle, similaire à “/lyon“ ou “/lille“.
 
 ## Historique et notes retour d'expérience
 

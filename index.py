@@ -253,8 +253,14 @@ def do_page():
             TEL='0033320543514'
             line = Redirect('ovhtel-15669832-1', TEL, '0033972366112')
         else:
-            print(f'<html><body>Pas de ville s&eacute;lectionn&eacute;, retournez sur la <a href="/">page de s&eacute;lection</a></body></html>')
-            notify('Pas de ville pour ' + str(os.environ['REQUEST_URI']))
+            print_html('''<html>
+<body>
+  <h1>Permanences T&eacute;l&eacute;phoniques Cimade</h1>
+  <p>Choisissez votre ville :</p>
+    <p><a href="/lyon">Lyon</a></p>
+    <p><a href="/lille">Lille</a></p>
+  </body>
+<html>''')
             return
     except Exception as e:
         notify(str(e))

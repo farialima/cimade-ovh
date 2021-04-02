@@ -1,7 +1,9 @@
-DirectoryIndex index.html
+DirectoryIndex index.py
 
 RewriteEngine on
-RewriteRule ^.*/$  index.py [L]
+RewriteCond %{REQUEST_URI} !=/
+RewriteCond %{REQUEST_URI} !=/index.py
+RewriteRule (.*) / [L]
 
 Header set Cache-Control "no-cache, no-store, must-revalidate"
 Header set Pragma "no-cache"

@@ -26,14 +26,16 @@ class Client(ovh.Client):
         self.check_credentials()
         
     def check_credentials(self):
+        # this is not really needed since we use unlimited token... but I wrote it so I leave it :)
         max_expiration_dates = max(
-            datetime.strptime(self.get('/me/api/credential/'+str(id))['expiration'].split('T')[0],
+            # if no expiration date, it's unlimited
+            datetime.strptime((self.get('/me/api/credential/'+str(id))['expiration'] or '2999-12-31T00:00').split('T')[0],
                                   '%Y-%m-%d').date()
             for id in self.get('/me/api/credential', applicationId=APPLICATION_ID))
         remaining = (max_expiration_dates - datetime.now().date()).days
         if (remaining < 7):
             notify(f"Les credentials vont expirer dans {remaining} jours !!!")
-        if (remaining < 2):
+        if (remaining < 2): 
             print_html(f'''<p style="color: red">Attention: les permissions d'acc&egrave;s &agrave; pour cette page vont expirer dans {remaining} jour(s) - ensuite cette page ne fonctionnera plus !<br/>
 Contactez François au 06 99 12 47 55 ou <a href="mailto:francois@granade.com">francois@granade.com</a> pour qu'il les renouvelle</p>
 ''')

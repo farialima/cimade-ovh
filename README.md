@@ -28,7 +28,12 @@ contient :
 
 ## Installation
 
-Le site peut tourner sur un serveur Apache avec FastGCI et Python 3. Installer les lib tierces de `requirements.txt`. Il faut créer un fichier `ovh.conf` basé sur `ovh-example.conf` et y ajouter un ’token' générée avec `create_consumer_key.py`. On peut créer une ’token’ à durée de vie illimité.
+Le site peut tourner sur un serveur Apache avec FastGCI et Python 3.
+
+Pour installer :
+- creer un virtualenv dans `./.venv3`
+- installer les lib tierces de `requirements.txt`.
+- créer un fichier `ovh.conf` basé sur `ovh-example.conf` et y ajouter un ’token' générée avec `create_consumer_key.py`. On peut créer une ’token’ à durée de vie illimité.
 
 ## Configuration des lignes
 

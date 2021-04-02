@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-this_file='/home/faria/permtel.farialima.net/.venv3/bin/activate_this.py'
-
-exec(open(this_file).read(), dict(__file__=this_file))
+from os.path import join, dirname, abspath
+activate_this=join(dirname(abspath(__file__)), '.venv3/bin/activate_this.py')
+exec(open(activate_this).read(), dict(__file__=activate_this))
 
 import os
 import sys

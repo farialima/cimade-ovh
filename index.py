@@ -14,7 +14,7 @@ from datetime import datetime
 import subprocess
 from email.message import EmailMessage
 from html import escape
-
+from functools import lru_cache
 
 import pytz
 import ovh
@@ -102,11 +102,9 @@ class Redirect(Client):
             or 'featureType' not in redirect_info
             or redirect_info['featureType'] != 'redirect'):
               raise Exception(f'Line {service_name} not configured for redirection')
-        self.sip = f'/telephony/{billing_account}/line/{redirect_info["destination"]}/options'
+        self.sip_number = redirect_info["destination"]
+        self.sip = f'/telephony/{billing_account}/line/{self.sip_number}/options'
 
-    def calls(self):
-        return None, None
-    
     def set_agent(self, number):
         self.put(self.sip,
                        forwardUnconditional=True,
@@ -121,11 +119,16 @@ class Redirect(Client):
     def is_started(self):
         return self.get_active_agent() != None
     
+    @lru_cache()
     def get_active_agent(self):
         agent = self.get(self.sip)
         if agent['forwardUnconditional']:
             return agent['forwardUnconditionalNumber']
         
+    def print_detailed_info(self):
+        if not self.is_started():
+            print_html(f'<p>Les appels sont actuellement re&ccedil;us sur le poste {_french_call(self.sip_number)}.</p>')
+    
     def delete_all_agents(self):
         # there's only one agent...
         self.put(self.sip,
@@ -143,13 +146,6 @@ class Queue(Client):
             raise Exception("error, not one queue: " + repr(queues))
         self.queueId = queues[0]
 
-    def calls(self):
-        queue = self.queue_name + f'{self.queueId}'
-        calls = [ self.get(queue + f'/liveCalls/{id}') for id in sorted(self.get(queue + '/liveCalls')) ]
-        waiting_calls = [ call for call in calls if call['state'] == 'Waiting' ]
-        answered_calls = [ call for call in calls if  call['state'] == 'Answered' ]
-        return waiting_calls, answered_calls
-    
     def start_perm(self):
         tz = pytz.timezone('Europe/Paris')
         day = WEEKDAYS[datetime.now(tz).weekday()].lower()
@@ -175,6 +171,7 @@ class Queue(Client):
         except ovh.exceptions.BadParametersError as e:
             print(e)
 
+    @lru_cache()
     def is_started(self):
         return self._condition() != None
     
@@ -220,6 +217,34 @@ class Queue(Client):
                         queueId=self.queueId)
             #print(f'created as {agent_id} and enabled')
 
+    def print_detailed_info(self):
+        queue = self.queue_name + f'{self.queueId}'
+        calls = [ self.get(queue + f'/liveCalls/{id}') for id in sorted(self.get(queue + '/liveCalls')) ]
+        waiting_calls = [ call for call in calls if call['state'] == 'Waiting' ]
+        answered_calls = [ call for call in calls if  call['state'] == 'Answered' ]
+
+        _time = lambda date: ' à ' + date[11:16]
+        print_html("<br/><br/>")
+        if answered_calls != None:
+            print_html("<b>Appel en cours :&nbsp;</b>")
+            if answered_calls:
+                for call in answered_calls:
+                    print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
+                                + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
+            else:
+                print("Pas d'appel")
+            print("<br/><br/>")
+        if waiting_calls == None:
+            print("<b><i>Pas de file d'attente d'appels</i></b>\n")        
+        else:
+            print("<b>Appels en attente :</b>\n")
+            if waiting_calls:
+                for call in waiting_calls:
+                    print(" <br/>\n")
+                    print_html("du " + _french_call(call['callerIdNumber']) + _time(call['begin']))
+            else:
+                print("Pas d'appels")
+        
     def delete_all_agents(self):
         conditions = self.get(self.conditions)
         for conditionId in conditions:
@@ -305,39 +330,18 @@ def do_page():
     print('''<h2>&Eacute;tat actuel</h2>''')
     
     is_started = line.is_started()
-    print_html("<b>Permanence en cours :</b>")
     if not is_started:
-        print_html("Pas de permanence en cours<br/>")
+        print_html("Pas de permanence en cours,<br/>pas de renvoi d'appels actuellement.<br/>")
     else:
+        print_html("<b>Permanence en cours :</b>")
         print_html(" répondue par&nbsp;: ")
         agent = line.get_active_agent()
         if not agent:
             print_html("(pas de num&eacute;ro de réponse))")
         else:
             print_html(_french_call(agent))
-    print_html("<br/><br/>")
 
-    waiting_calls, answered_calls = line.calls()
-    _time = lambda date: ' à ' + date[11:16]
-    if answered_calls != None:
-        print_html("<b>Appel en cours :&nbsp;</b>")
-        if answered_calls:
-            for call in answered_calls:
-                print_html("<br/>du " + _french_call(call['callerIdNumber']) + _time(call['begin'])
-                            + ", repondu par " + _french_call(call['agent']) + _time(call['answered']))
-        else:
-            print("Pas d'appel")
-        print("<br/><br/>")
-    if waiting_calls == None:
-        print("<b><i>Pas de file d'attente d'appels</i></b>\n")        
-    else:
-        print("<b>Appels en attente :</b>\n")
-        if waiting_calls:
-            for call in waiting_calls:
-                print(" <br/>\n")
-                print_html("du " + _french_call(call['callerIdNumber']) + _time(call['begin']))
-        else:
-            print("Pas d'appels")
+    line.print_detailed_info()
 
     if is_started:
         print_html('<h2>Changer de num&eacute;ro</h2>')
@@ -357,13 +361,11 @@ Votre num&eacute;ro de t&eacute;l&eacute;phone (10 chiffres)&nbsp;:&nbsp;<input 
 <form action="" method="POST"> 
 <input type="hidden" name="finish" value="yes"/>
 Si vous avez fini, cliquez&nbsp;:&nbsp;<input type="submit" value="Terminer la permanence"/>
+</form>
 ''')
-        if waiting_calls != None:
+        if line.__class__ == Queue:
             print_html(f'''
 <p style="color:red">Attention, une fois la permanence terminée, vous recevrez encore les appels en attente.</p>
-''')
-        print_html(f'''
-</form>
 ''')
     print_html('''
 </body>

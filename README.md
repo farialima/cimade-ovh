@@ -1,19 +1,20 @@
 # cimade-ovh
 
-Page web très simple pour que les utilisateurs definissent eux-même les renvois d'appels, sur téléphonie OVH, soit sur un poste SIP, soit dans une file d'appel (déjà définie).
+Ce projet est une toute petite app web, en fait une page web très simple, pour que les utilisateurs definissent eux-même les renvois d'appels, sur téléphonie OVH, soit sur un poste SIP, soit dans une file d'appel (à définir auparavant sur le site d'administration OVH).
 
 ## Contexte
 
 Le groupe informatique Cimade semble un peu débordé pour gérer les demandes de changement de ligne, de renvoi d’appel, etc. Donc le but est de rendre plus autonomes les groupes locaux de la Cimade, pour qu'ils gèrent leurs permanences téléphoniques eux-mêmes.
 
 Mais faire utiliser le site d’administration OVH ( https://www.ovh.com/manager/ ) par les groupes locaux, ou même par les permanents régionaux, n’est pas simple :
--  ce site est difficile à utiliser, cela demande un apprentissage important : la UI est complexe, et il y a des petites subtilités (bugs de rafraîchissement…)
+-  ce site est difficile à utiliser, cela demande un apprentissage important : la UI est complexe, et il y a des petites subtilités (bugs de rafraîchissement…). 
 - le risque de “casser” quelque chose est important, et dans ce cas l’informatique du siège devrait réparer. Mon expérience est que comprendre que ce d’autres ont configuré (partiellement, ou sans réussir) est souvent très complexe
 - il faut donner accès aux utilisateurs à ce site, ce qui n’est pas simple (voir tutorial écrit spécifiquement). Et une fois qu’ils ont cet accès, ils peuvent *voir* tous les configuration, ce qui est complexe et peut-être pas souhaitable.
+Donner accès aux groupes locaux à l'interface OVH donnerait, je pense, beaucoup de travail au groupe informatique : il faudrait trouver les bons "administrateurs" locaux ou régionaux qui ne seront pas rebutés par le site d'administration OVH ; les former ; compléter les tutoriaux ; et leur fournir du support. Je pense donc que ce n'est pas une bonne solution.
 
 Donc j’ai cherché un mécanisme plus simple d’accès. La solution adoptée est de s’assurer que les tâches _quotidiennes_ (rediriger la ligne vers un téléphone externe) peuvent être faites par les groupes locaux, et que l’informatique du siège garde le contrôle des lignes, et fait (sur demande des GLs) les grosses configurations : création de file d’attente, configuration des téléphone SIPs.
 
-L’idée est donc l’informatique Cimade configure les lignes pour les GLs, mais n’a pas besoin de faire un suivi quotidien, ou hebdomadaire, comme c’est le cas actuellement, semble-t-il. Cela devrait permettre de gagner beaucoup d temps, et de ‘
+L’idée est donc l’informatique Cimade configure les lignes pour les GLs, mais n’a pas besoin de faire un suivi quotidien, ou hebdomadaire, comme c’est le cas actuellement, semble-t-il. Cela devrait permettre de gagner beaucoup de temps ; et cela veut dire qu'il y a moins besoin, pour l'instant, de completer des tutoriaux sur comment et de laisser les régions ou les GLs acceder au site d'administration OVH.
 
 
 ## Description
@@ -43,7 +44,7 @@ Pour ajouter un groupe local, il faut donc :
 - sur https://www.ovh.com/manager/ , créer une file d’attente, défini les messages voix, etc..(pour utiliser `Queue`) ; ou rediriger une ligne externe vers un poste SIP (pour utiliser `Redirect`)
 - éditer index.py pour ajouter la configuration (dans les lignes ~250). C’est très simple si on connait un peu de Python, juste copier Lyon ou Lille. Ajouter aussi un lien vers une sous-page (virtuelle, similaire à “/lyon“ ou “/lille“.
 
-## Historique et notes retour d'expérience
+## Historique
 
 J’ai passé pas mal de temps, lors du re-confinement de novembre 2020, à configurer les lignes OVH pour que des permanences Cimade de Lyon puissent être faites par différents bénévoles à différents moments, c’est à dire que le changement de renvoi d’appel, de façon automatique.
 
@@ -53,17 +54,17 @@ La difficulté a été, comme souvent, que OVH est très puissant, mais parfois 
 
 D'abord, j'ai mis en place fichier texte avec un format qui definissaient les permanences sur une semaine, et un cron job pour les commencer/terminer. Mais ce mécanisme demandait trop de gestion quotidiennes : les GL changent souvent. Ce code est encore dans l’historique Git.
 
-En attendant, les résultats :
+# Conclusions / problemes / bugs / perspectives
 
-- cela marche vraiment bien, pas besoin de présence humaine, ouf.
+- Cela marche vraiment bien (testé par deux groupes locaux). Pas de bug connus.
 
-- il y a des complexités prévisibles avec les répondeurs, double-appel, etc. des bénévoles. La meilleur solution est de prévoir un temps de durée de sonnerie très court (10 secondes ou moins) pour que les appels passent au suivant avant que les répondeurs se mettent en route.
+- Il y a des complexités prévisibles avec les répondeurs, double-appel, etc. des bénévoles, quand on utilise une file d'appel. La meilleur solution est de prévoir un temps de durée de sonnerie très court (10 secondes ou moins) pour que les appels passent au suivant avant que les répondeurs se mettent en route.
 
-Il vaut mieux que les benevoles utilisent une ligne mobile que fixe : il y a souvent des problemes avec les lignes fixes.
+En particulier, Il vaut mieux que les benevoles utilisent une ligne mobile que fixe : il y a souvent des problemes avec les lignes fixes.
 
-- L’idée est aussi de collecter des statistiques sur les appels. Si OVH n’a pas de moyens direct d’en collecter (nombre d’appels abandonnés, nombre d’appel pris, durée moyenne d’attente…), me permettra d’en générer assez simplement.
+- Il est important d'enregistrer des messages d'accueil, de débordement, ... surtout quand on utilise une file d'appel. Sinon les gens ne comprennent pas.
 
-- je n’ai pas configuré plusieurs lignes en même temps (avoir plusieurs bénévoles qui répondent, chacun à un appel) parce que finalement, les bénévoles n’ont pas souhaité le faire — ils ont préféré avoir une seule personne. Mais ce serait facile à faire.
+- je n’ai pas implémenté la possibilité d'avoir plusieurs bénévoles qui répondent en même temps, chacun à un appel (plusieurs lignes en même temps). Lyon n’a pas souhaité l'avoir,  ils ont préféré avoir une seule personne ; Lille en a parlé, il en auront peut-être le besoin. Ce serait facile à ajouter (c'est presque plus la UI qui demandera du travail - gérer plusieurs champs "telephone")
 
 - pour que les appels soient pris par deux bénévoles à la fois (appel à trois “automatique”), en particulier pour que des bénévoles en cours de formation puissent participer aux appels, une solution qui marche : 
   * faire une file d'appel, pour que les appels soient transmis un-par-un
@@ -73,7 +74,7 @@ Il vaut mieux que les benevoles utilisent une ligne mobile que fixe : il y a sou
 ```
 (Voir la doc sur https://www.twilio.com/docs/voice/twiml/conference et https://www.twilio.com/docs/voice/api/conference-resource )
 
-Cela marche, on s'en est servi : la seule complexité est qu'il faut que les gens qui appellent racrochent eux-même, pour que l'appel suivant soit transmis. Et aussi, il est transmis immediatement, donc pas de pause :). 
+Cela marche, on s'en est servi : la seule complexité est qu'il faut que les gens qui appellent racrochent eux-mêmes, pour que l'appel suivant soit transmis. Et aussi, il est transmis immediatement, donc pas de pause :). 
 
-- le support ‘premium’ OVH est tout à fait bien :)
+- le support ‘premium’ OVH est tout à fait bien -- ça vaut le coup de les appeler, même si on attend très longtemps, parfois plusieurs heures, ils savent bien les choses et prennent le temps de répondre. C'est souvent mieux que mettre un ticket.
 

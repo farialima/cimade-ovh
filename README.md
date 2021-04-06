@@ -26,7 +26,7 @@ Le projet contient :
 
 ## Installation
 
-Le site peut tourner sur un serveur Apache avec FastGCI et Python 3.
+Le site peut tourner sur un serveur Apache 2 avec mod_rewrite et FastGCI, et Python 3.
 
 Pour installer :
 - creer un virtualenv dans `./.venv3`

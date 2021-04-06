@@ -254,8 +254,9 @@ class Queue(Client):
 
 def notify(message):
     msg = EmailMessage()
-    msg.set_content(message + "\n\nSee https://permtel.farialima.net/ for more information.")
-    msg['From'] = "faria@john-adams.dreamhost.com"
+    script_uri = os.environ.get('SCRIPT_URI', '(non connu)') # SCRIPT_URL is set by mod_rewrite
+    msg.set_content(message + "\n\nVoir le site des permanence: " + script_uri)
+    msg['From'] = os.environ.get('SERVER_ADMIN', 'admin@inconnu') 
     msg['To'] = "ovh-notification@farialima.net"
     msg['Subject'] = f"Permtel notification pour {CITY}"
     

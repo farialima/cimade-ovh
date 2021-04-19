@@ -3,6 +3,7 @@ DirectoryIndex index.py
 RewriteEngine on
 RewriteCond %{REQUEST_URI} !=/
 RewriteCond %{REQUEST_URI} !=/index.py
+RewriteCond %{REQUEST_URI} !=/favicon.ico
 RewriteRule (.*) / [L]
 
 Header set Cache-Control "no-cache, no-store, must-revalidate"

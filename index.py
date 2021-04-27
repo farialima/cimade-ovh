@@ -33,9 +33,10 @@ WEEKDAYS = [
 
 logging.basicConfig(filename=join(dirname(abspath(__file__)), "activity.log"),
                     filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
+logging.getLogger('ovh.vendor').setLevel(logging.WARN)
 
 try:
     # python >= 3.7
@@ -302,7 +303,7 @@ def do_page(city, line):
             if 'finish' in multiform:
                 line.stop_perm()
                 print_html(f'<p style="color: blue">Permanence terminée</p>')
-                notify('Permanence terminée', city)
+                notify('Permanence finished', city)
             else:
                  # unescape needed because when copy/pasting on Safari, getting chars like "&#8236;" !!
                 tel = html.unescape(multiform['tel'][0]) if 'tel' in multiform else ''
@@ -310,7 +311,7 @@ def do_page(city, line):
                 line.set_agent(number)
                 line.start_perm()
                 print_html(f'<p style="color: blue">Permanence commencée sur le numéro {tel}</p>')
-                notify(f'Permanence commencée sur le numéro {tel}', city)
+                notify(f'Permanence started on number {tel}', city)
            
         except Exception as e:
             print_html(f'''<p style="color: red">Erreur: {e}</p>

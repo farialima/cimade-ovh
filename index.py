@@ -17,19 +17,8 @@ from html import escape
 from functools import lru_cache
 import logging
 
-import pytz
+from babel.dates import get_timezone, format_datetime
 import ovh
-
-WEEKDAYS = [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-    ]
-
 
 logging.basicConfig(filename=join(dirname(abspath(__file__)), "activity.log"),
                     filemode='a',
@@ -49,16 +38,6 @@ except:
             return False
         return True
 
-def french_datetime():
-    current_locale = locale.setlocale(locale.LC_TIME)
-    try:
-        locale.setlocale(locale.LC_TIME, "fr_FR")
-        tz = pytz.timezone('Europe/Paris')
-        now = datetime.now(tz)
-        return now.strftime("%A %d %b %Y à %H:%M:%S")
-    finally:
-        locale.setlocale(locale.LC_TIME, current_locale)
-    
 def format_tel(tel):
     number = tel.replace(' ', '').replace('-', '')
     if not isascii(number) or not number.isnumeric():
@@ -156,8 +135,9 @@ class Queue(Client):
         self.queueId = queues[0]
 
     def start_perm(self):
-        tz = pytz.timezone('Europe/Paris')
-        day = WEEKDAYS[datetime.now(tz).weekday()].lower()
+        day = format_datetime(datetime.utcnow(),
+                              'eeee',
+                              tzinfo=get_timezone('Europe/Paris')).lower()
         try:
             self.post(self.conditions,
                         timeFrom="02:00:00",
@@ -285,7 +265,10 @@ def do_page(city, line):
 ''')
     
     tel = ''
-    now = french_datetime()
+    now = format_datetime(datetime.utcnow(),
+                          #format='long',
+                          tzinfo=get_timezone('Europe/Paris'),
+                          locale='fr_FR')
     print_html(f'''<h1>Permanences T&eacute;l&eacute;phoniques Cimade {city}</h1>
 <p><b>Cette page est pour {city} sur le num&eacute;ro {line.get_tel()}.</b><br/>
 <i>Pour la liste des villes, allez <a href="/">ici</a></i></p>

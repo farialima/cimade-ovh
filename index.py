@@ -33,8 +33,8 @@ WEEKDAYS = [
 
 logging.basicConfig(filename=join(dirname(abspath(__file__)), "activity.log"),
                     filemode='a',
-                    format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
+                    format='%(asctime)s %(message)s',
+                    datefmt='%m-%d %a %H:%M',
                     level=logging.INFO)
 logging.getLogger('ovh.vendor').setLevel(logging.WARN)
 
@@ -50,7 +50,7 @@ except:
         return True
 
 def french_datetime():
-    current_locale = locale.getlocale()[0]
+    current_locale = locale.setlocale(locale.LC_TIME)
     try:
         locale.setlocale(locale.LC_TIME, "fr_FR")
         tz = pytz.timezone('Europe/Paris')

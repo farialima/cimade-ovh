@@ -137,12 +137,13 @@ class Queue(Client):
     def start_perm(self):
         day = format_datetime(datetime.utcnow(),
                               'eeee',
-                              tzinfo=get_timezone('Europe/Paris')).lower()
+                              tzinfo=get_timezone('Europe/Paris'),
+                              locale='en_US')
         try:
             self.post(self.conditions,
                         timeFrom="02:00:00",
                         timeTo="23:59:59",
-                        weekDay=day,
+                        weekDay=day.lower(),
                         policy="available")
         except ovh.exceptions.BadParametersError as e:
             print(e)
